@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Socket.IO Test</title>
+</head>
+<body>
+  <h1>Hello</h1>
+  <video id="localVideo" autoplay muted playsinline></video>
+  <video id="remoteVideo" autoplay playsinline></video>
+
+ 
+  <script src="/socket.io/socket.io.js"></script>
+
+  <script type="module">
+    const socket = io();
+    const roomid="room1";
+
+    // socket.on("connect", () => {
+    //   console.log("Connected to server:", socket.id);
+    //   socket.emit("join-room",roomid);
+    // });
+
+    const configuration = {'iceServers' : [{'urls':'stun:stun.l.google.com:19302'}]};
+        const peerConnection = new RTCPeerConnection(configuration);
+
+        
+    //connection state
+    peerConnection.addEventListener('connectionstatechange', event =>{
+        console.log("connection state",peerConnection.connectionState);
+    })
+
+
+
+
+//mediadevices
+let isStreamReady = false;
+let candidateQueue = [];
+
+// 1. Initialize Media First
+async function init() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        document.getElementById("localVideo").srcObject = stream;
+        
+        stream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, stream);
+        });
+        
+        isStreamReady = true;
+        // Only join the room AFTER our camera is ready
+        socket.emit("join-room", roomid);
+    } catch (e) {
+        console.error("Media error:", e);
+    }
+}
+
+init();
+// peerConnection.addTransceiver("video");
+// peerConnection.addTransceiver("audio");
+
+
+
+
+    
+   
+        
+
+
+//initiator
+    socket.on('Initiator',async ()=>{
+        console.log("got initiator");  
+    })
+
+//ready
+    socket.on('ready',async ()=>{
+        if (!isStreamReady) return;
+        console.log("room ready creating offer")
+        const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    socket.emit('offer',{ offer, roomid });
+       
+    })
+
+    
+        
+    
+    
+//offer
+    socket.on("offer",async (data) =>{
+        const roomid = data.roomid;
+            console.log("received offer");
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            const answer =await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            socket.emit('answer',{ answer, roomid });
+            processQueuedCandidates();
+        
+    })
+
+//answer
+    socket.on("answer",async (data)=>{
+        console.log("received answer");
+       const remotedisc=new RTCSessionDescription(data.answer);
+            await peerConnection.setRemoteDescription(remotedisc);
+            processQueuedCandidates();
+    })
+
+
+    socket.on("new-ice-candidate",async (data) =>{
+        console.log("received ICE");
+        if(data.candidate){
+            try{
+                if (peerConnection.remoteDescription) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+    }
+            }catch(e){
+                console.error("error adding received ice candidate", e);
+            }
+        }
+    })
+
+
+    function processQueuedCandidates() {
+        while (candidateQueue.length > 0) {
+            const candidate = candidateQueue.shift();
+            peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+    }
+
+
+
+    //ice candidates
+    peerConnection.addEventListener('icecandidate',event=>{
+        if(event.candidate){
+            console.log("sending ICE");
+            socket.emit('new-ice-candidate',{ candidate: event.candidate, roomid });
+        }
+    });
+
+
+    const remoteVideo=document.getElementById('remoteVideo')
+const remoteStream =new MediaStream();
+remoteVideo.srcObject=remoteStream
+
+peerConnection.ontrack = (event) => {
+    console.log("ontrack fired");
+  remoteStream.addTrack(event.track)
+};
+
+
+
+
+
+    
+  </script>
+</body>
+</html>
