@@ -15,10 +15,10 @@
     const socket = io();
     const roomid="room1";
 
-    socket.on("connect", () => {
-      console.log("Connected to server:", socket.id);
+    // socket.on("connect", () => {
+    //   console.log("Connected to server:", socket.id);
      
-    });
+    // });
 
     const configuration = {'iceServers' : [{'urls':'stun:stun.l.google.com:19302'}]};
         const peerConnection = new RTCPeerConnection(configuration); 
