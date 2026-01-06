@@ -24,7 +24,7 @@
         const peerConnection = new RTCPeerConnection(configuration); 
 
         
-    //connection state
+    //connection state 
     peerConnection.addEventListener('connectionstatechange', event =>{
         console.log("connection state",peerConnection.connectionState);
     })
